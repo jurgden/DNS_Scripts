@@ -2,7 +2,10 @@ import requests
 from dotenv import load_dotenv
 import os
 
-import requests
+load_dotenv()
+
+zone_id = os.getenv('ZONE_ID')
+api_token = os.getenv('API_TOKEN')
 
 
 def get_public_ip():
@@ -11,6 +14,7 @@ def get_public_ip():
         return response.json()["ip"]
     else:
         raise Exception("Could not obtain public IP")
+
 
     # Test the function
 try:
