@@ -57,11 +57,9 @@ def update_dns_record(zone_id, record_name, record_type, content, ttl, api_token
 
 
 # Configuration variables
-zone_id = "your_zone_id"
-record_name = "your_domain.com"
+record_name = "eldritchnet.com"
 record_type = "A"
 ttl = 3600  # Time to live in seconds
-api_token = "your_api_token"
 
 try:
     current_ip = get_public_ip()
