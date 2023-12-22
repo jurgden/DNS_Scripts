@@ -6,64 +6,67 @@ load_dotenv()
 
 zone_id = os.getenv('ZONE_ID')
 api_token = os.getenv('API_TOKEN')
+record_name = "eldritchnet.com"  # Replace with your actual domain or subdomain
+record_type = "A"
+ttl = 3600 * 24  # Time to live in seconds, set to 24 hours
+proxied = True  # Set to True to enable Cloudflare's proxy
 
 
 def get_public_ip():
-    response = requests.get("https://api.ipify.org?format=json")
-    if response.status_code == 200:
+    try:
+        response = requests.get("https://api.ipify.org?format=json")
+        # Will raise an HTTPError if the HTTP request returned an unsuccessful status code
+        response.raise_for_status()
         return response.json()["ip"]
-    else:
-        raise Exception("Could not obtain public IP")
+    except requests.exceptions.RequestException as e:  # This is the correct syntax
+        raise SystemExit(e)
 
 
-    # Test the function
-try:
-    my_ip = get_public_ip()
-    print(f"My Public IP Address: {my_ip}")
-except Exception as e:
-    print(str(e))
-
-
-def update_dns_record(zone_id, record_name, record_type, content, ttl, api_token):
+def update_dns_record(zone_id, record_name, record_type, content, ttl, proxied, api_token):
+    headers = {
+        "Authorization": f"Bearer {api_token}",
+        "Content-Type": "application/json"
+    }
     list_url = f"https://api.cloudflare.com/client/v4/zones/{zone_id}/dns_records"
-    headers = {"Authorization": f"Bearer {api_token}",
-               "Content-Type": "application/json"}
 
-    # Find the DNS record ID
-    response = requests.get(list_url, headers=headers, params={
-                            "name": record_name, "type": record_type})
-    if response.status_code != 200 or not response.json()['success']:
-        raise Exception(f"Failed to find DNS record: {response.text}")
+    try:
+        # Find the DNS record ID
+        list_response = requests.get(list_url, headers=headers, params={
+                                     "name": record_name, "type": record_type})
+        list_response.raise_for_status()
 
-    records = response.json()['result']
-    if not records:
-        raise Exception("No DNS records found matching the criteria.")
+        records = list_response.json()['result']
+        if not records:
+            raise ValueError("No DNS records found matching the criteria.")
 
-    record_id, current_ip = records[0]['id'], records[0]['content']
+        record_id, current_ip = records[0]['id'], records[0]['content']
 
-    # Check if IP needs to be updated
-    if current_ip != content:
-        update_url = f"https://api.cloudflare.com/client/v4/zones/{zone_id}/dns_records/{record_id}"
-        data = {"type": record_type, "name": record_name,
-                "content": content, "ttl": ttl}
-        response = requests.put(update_url, json=data, headers=headers)
-        if response.status_code == 200 and response.json()['success']:
+        # Check if IP needs to be updated
+        if current_ip != content:
+            update_url = f"{list_url}/{record_id}"
+            data = {
+                "type": record_type,
+                "name": record_name,
+                "content": content,
+                "ttl": ttl,
+                "proxied": proxied
+            }
+            update_response = requests.put(
+                update_url, json=data, headers=headers)
+            update_response.raise_for_status()
             print(
                 f"DNS record {record_name} updated successfully to {content}.")
         else:
-            raise Exception(f"Failed to update DNS record: {response.text}")
-    else:
-        print("No update required. Current IP matches the DNS record.")
+            print("No update required. Current IP matches the DNS record.")
+    except requests.exceptions.RequestException as e:
+        raise SystemExit(e)
+    except ValueError as e:
+        raise SystemExit(e)
 
-
-# Configuration variables
-record_name = "eldritchnet.com"
-record_type = "A"
-ttl = 3600  # Time to live in seconds
 
 try:
     current_ip = get_public_ip()
     update_dns_record(zone_id, record_name, record_type,
-                      current_ip, ttl, api_token)
+                      current_ip, ttl, proxied, api_token)
 except Exception as e:
     print(str(e))
